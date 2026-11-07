@@ -20,9 +20,9 @@
 		<template #default>
 			<div class="kanban-view">
 				<div
+					ref="kanbanBoard"
 					:class="{ 'is-loading': showInitialLoading, 'is-dragging': drag || dragBucket }"
 					class="kanban kanban-bucket-container loader-container"
-					@dragover="handleBoardDragOver"
 				>
 					<BucketDraggable
 						v-bind="DRAG_OPTIONS"
@@ -302,7 +302,7 @@ import {
 	useUpdateBucketMutation,
 	useLoadBucketPageMutation,
 } from '@/client/queries/kanbanMutations'
-import {computed, nextTick, ref, watch, toRef} from 'vue'
+import {computed, nextTick, onBeforeUnmount, onMounted, ref, watch, toRef} from 'vue'
 import {useQuery, useQueryClient} from '@tanstack/vue-query'
 import {useRouter} from 'vue-router'
 import {useRouteQuery} from '@vueuse/router'
@@ -361,7 +361,8 @@ const DRAG_OPTIONS = {
 } as const
 
 const DRAG_SCROLL_EDGE = 80
-const DRAG_SCROLL_STEP = 25
+const DRAG_SCROLL_TICK_MS = 16
+const DRAG_SCROLL_STEP = 20
 
 const MIN_SCROLL_HEIGHT_PERCENT = 0.25
 
@@ -800,23 +801,81 @@ function dragstart(bucket: BucketResponse) {
 	sourceBucket.value = bucket.id
 }
 
-function handleBoardDragOver(event: DragEvent) {
+const kanbanBoard = ref<HTMLElement | null>(null)
+
+let dragScrollTimer: ReturnType<typeof setInterval> | null = null
+let lastDragPointerX = 0
+
+function startDragScroll() {
+	if (dragScrollTimer !== null) {
+		return
+	}
+
+	dragScrollTimer = setInterval(() => {
+		if (!drag.value && !dragBucket.value) {
+			stopDragScroll()
+			return
+		}
+
+		const board = kanbanBoard.value
+		if (!board) {
+			return
+		}
+
+		const rect = board.getBoundingClientRect()
+		if (lastDragPointerX > rect.right - DRAG_SCROLL_EDGE) {
+			board.scrollLeft += DRAG_SCROLL_STEP
+		} else if (lastDragPointerX < rect.left + DRAG_SCROLL_EDGE) {
+			board.scrollLeft -= DRAG_SCROLL_STEP
+		}
+	}, DRAG_SCROLL_TICK_MS)
+}
+
+function stopDragScroll() {
+	if (dragScrollTimer === null) {
+		return
+	}
+
+	clearInterval(dragScrollTimer)
+	dragScrollTimer = null
+}
+
+watch([drag, dragBucket], ([isDragging]) => {
+	if (isDragging) {
+		startDragScroll()
+	} else {
+		stopDragScroll()
+	}
+})
+
+function trackDragPointer(clientX: number) {
+	lastDragPointerX = clientX
+}
+
+function handleDocumentMouseMove(event: MouseEvent) {
 	if (!drag.value && !dragBucket.value) {
 		return
 	}
+	trackDragPointer(event.clientX)
+}
 
-	const board = event.currentTarget as HTMLElement | null
-	if (!board) {
+function handleDocumentDragOver(event: DragEvent) {
+	if (!drag.value && !dragBucket.value) {
 		return
 	}
-
-	const rect = board.getBoundingClientRect()
-	if (event.clientX > rect.right - DRAG_SCROLL_EDGE) {
-		board.scrollLeft += DRAG_SCROLL_STEP
-	} else if (event.clientX < rect.left + DRAG_SCROLL_EDGE) {
-		board.scrollLeft -= DRAG_SCROLL_STEP
-	}
+	trackDragPointer(event.clientX)
 }
+
+onMounted(() => {
+	document.addEventListener('mousemove', handleDocumentMouseMove)
+	document.addEventListener('dragover', handleDocumentDragOver)
+})
+
+onBeforeUnmount(() => {
+	document.removeEventListener('mousemove', handleDocumentMouseMove)
+	document.removeEventListener('dragover', handleDocumentDragOver)
+	stopDragScroll()
+})
 
 function handleTaskDragStart(e: SortableEvent) {
 	const taskId = Number(e.item.dataset.taskId)
