@@ -804,6 +804,7 @@ function dragstart(bucket: BucketResponse) {
 const kanbanBoard = ref<HTMLElement | null>(null)
 
 let dragScrollTimer: ReturnType<typeof setInterval> | null = null
+let dragScrollZoneLogs = 0
 let lastDragPointerX = 0
 
 function startDragScroll() {
@@ -811,6 +812,7 @@ function startDragScroll() {
 		return
 	}
 
+	console.log('[kz] startDragScroll')
 	dragScrollTimer = setInterval(() => {
 		if (!drag.value && !dragBucket.value) {
 			stopDragScroll()
@@ -819,13 +821,18 @@ function startDragScroll() {
 
 		const board = kanbanBoard.value
 		if (!board) {
+			console.log('[kz] tick: no board ref')
 			return
 		}
 
 		const rect = board.getBoundingClientRect()
 		if (lastDragPointerX > rect.right - DRAG_SCROLL_EDGE) {
+			console.log(`[kz] tick right zone x=${lastDragPointerX} right=${rect.right} scrollLeft=${board.scrollLeft} scrollWidth=${board.scrollWidth} clientWidth=${board.clientWidth}`)
 			board.scrollLeft += DRAG_SCROLL_STEP
 		} else if (lastDragPointerX < rect.left + DRAG_SCROLL_EDGE) {
+			if (dragScrollZoneLogs++ < 5) {
+				console.log(`[kz] tick left zone x=${lastDragPointerX} left=${rect.left}`)
+			}
 			board.scrollLeft -= DRAG_SCROLL_STEP
 		}
 	}, DRAG_SCROLL_TICK_MS)
@@ -841,6 +848,7 @@ function stopDragScroll() {
 }
 
 watch([drag, dragBucket], ([isDragging]) => {
+	console.log(`[kz] watch drag=${drag.value} dragBucket=${dragBucket.value} isDragging=${isDragging}`)
 	if (isDragging) {
 		startDragScroll()
 	} else {
@@ -849,6 +857,9 @@ watch([drag, dragBucket], ([isDragging]) => {
 })
 
 function trackDragPointer(clientX: number) {
+	if (lastDragPointerX !== clientX) {
+		console.log(`[kz] track x=${clientX}`)
+	}
 	lastDragPointerX = clientX
 }
 
@@ -867,6 +878,7 @@ function handleDocumentDragOver(event: DragEvent) {
 }
 
 onMounted(() => {
+	console.log('[kz] mounted, attaching listeners')
 	document.addEventListener('mousemove', handleDocumentMouseMove)
 	document.addEventListener('dragover', handleDocumentDragOver)
 })
