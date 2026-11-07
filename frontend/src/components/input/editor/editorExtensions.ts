@@ -25,6 +25,7 @@ import {BlockquoteWithCommentId} from './blockquoteWithCommentId'
 import {TaskLink, LINK_HTML_ATTRIBUTES} from './taskLink'
 import {createClipboardParser, fillRequiredContent, repairSliceContent} from './contentRepair'
 import {htmlHasFormatting} from './clipboardHtml'
+import {serializeSliceAsText} from './clipboardText'
 
 import Commands from './commands'
 import suggestionSetup from './suggestion'
@@ -285,6 +286,37 @@ export function createEditorExtensions(deps: EditorExtensionDeps): Extensions {
 		},
 	})
 
+	const CopyAsText = Extension.create({
+		name: 'copyAsText',
+
+		addProseMirrorPlugins() {
+			return [
+				new Plugin({
+					key: new PluginKey('copyAsText'),
+					props: {
+						clipboardTextSerializer: slice => serializeSliceAsText(slice),
+					},
+					view(view) {
+						const copyTarget = view.dom.parentElement ?? view.dom
+						const onCopy = (event: ClipboardEvent) => {
+							if (!event.clipboardData) {
+								return
+							}
+							event.clipboardData.setData('text/plain', serializeSliceAsText(view.state.selection.content()))
+							event.preventDefault()
+						}
+						copyTarget.addEventListener('copy', onCopy)
+						return {
+							destroy() {
+								copyTarget.removeEventListener('copy', onCopy)
+							},
+						}
+					},
+				}),
+			]
+		},
+	})
+
 	return [
 		// Starterkit:
 		StarterKit.configure({
@@ -405,5 +437,6 @@ export function createEditorExtensions(deps: EditorExtensionDeps): Extensions {
 		EmojiExtension,
 
 		PasteHandler,
+		CopyAsText,
 	]
 }

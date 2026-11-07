@@ -22,6 +22,7 @@
 				<div
 					:class="{ 'is-loading': showInitialLoading, 'is-dragging': drag || dragBucket }"
 					class="kanban kanban-bucket-container loader-container"
+					@dragover="handleBoardDragOver"
 				>
 					<BucketDraggable
 						v-bind="DRAG_OPTIONS"
@@ -354,7 +355,13 @@ const DRAG_OPTIONS = {
 	dragClass: 'task-dragging',
 	delayOnTouchOnly: true,
 	delay: 1000,
+	scroll: true,
+	scrollSensitivity: 80,
+	scrollSpeed: 10,
 } as const
+
+const DRAG_SCROLL_EDGE = 80
+const DRAG_SCROLL_STEP = 25
 
 const MIN_SCROLL_HEIGHT_PERCENT = 0.25
 
@@ -791,6 +798,24 @@ function shouldAcceptDrop(bucket: BucketResponse) {
 function dragstart(bucket: BucketResponse) {
 	drag.value = true
 	sourceBucket.value = bucket.id
+}
+
+function handleBoardDragOver(event: DragEvent) {
+	if (!drag.value && !dragBucket.value) {
+		return
+	}
+
+	const board = event.currentTarget as HTMLElement | null
+	if (!board) {
+		return
+	}
+
+	const rect = board.getBoundingClientRect()
+	if (event.clientX > rect.right - DRAG_SCROLL_EDGE) {
+		board.scrollLeft += DRAG_SCROLL_STEP
+	} else if (event.clientX < rect.left + DRAG_SCROLL_EDGE) {
+		board.scrollLeft -= DRAG_SCROLL_STEP
+	}
 }
 
 function handleTaskDragStart(e: SortableEvent) {
