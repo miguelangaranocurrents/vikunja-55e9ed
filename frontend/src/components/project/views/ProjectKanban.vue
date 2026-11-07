@@ -856,36 +856,34 @@ watch([drag, dragBucket], ([isDragging]) => {
 	}
 })
 
-function trackDragPointer(clientX: number) {
-	if (lastDragPointerX !== clientX) {
-		console.log(`[kz] track x=${clientX}`)
+let trackLogCount = 0
+
+function trackDragPointer(event: Event, clientX: number) {
+	if (trackLogCount < 25) {
+		trackLogCount++
+		const target = event.target as HTMLElement | null
+		console.log(`[kz] ev=${event.type} x=${clientX} target=${(target?.className ?? target?.nodeName) || '?'}`)
 	}
 	lastDragPointerX = clientX
 }
 
-function handleDocumentMouseMove(event: MouseEvent) {
-	if (!drag.value && !dragBucket.value) {
-		return
-	}
-	trackDragPointer(event.clientX)
-}
-
-function handleDocumentDragOver(event: DragEvent) {
-	if (!drag.value && !dragBucket.value) {
-		return
-	}
-	trackDragPointer(event.clientX)
+function handlePointerEvent(event: MouseEvent | DragEvent) {
+	trackDragPointer(event, event.clientX)
 }
 
 onMounted(() => {
 	console.log('[kz] mounted, attaching listeners')
-	document.addEventListener('mousemove', handleDocumentMouseMove)
-	document.addEventListener('dragover', handleDocumentDragOver)
+	document.addEventListener('mousemove', handlePointerEvent, true)
+	document.addEventListener('pointermove', handlePointerEvent, true)
+	document.addEventListener('dragover', handlePointerEvent, true)
+	document.addEventListener('drag', handlePointerEvent, true)
 })
 
 onBeforeUnmount(() => {
-	document.removeEventListener('mousemove', handleDocumentMouseMove)
-	document.removeEventListener('dragover', handleDocumentDragOver)
+	document.removeEventListener('mousemove', handlePointerEvent, true)
+	document.removeEventListener('pointermove', handlePointerEvent, true)
+	document.removeEventListener('dragover', handlePointerEvent, true)
+	document.removeEventListener('drag', handlePointerEvent, true)
 	stopDragScroll()
 })
 
